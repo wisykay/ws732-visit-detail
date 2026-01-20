@@ -1,0 +1,7 @@
+{
+  "name": "Wisy Visit Dashboard",
+  "description": "A high-fidelity replica of the Wisy visit details dashboard, featuring survey analysis, key metrics tracking, and an integrated AI summary powered by Gemini.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

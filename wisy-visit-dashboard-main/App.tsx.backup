@@ -1,0 +1,980 @@
+
+import React, { useState, useEffect } from 'react';
+import Sidebar from './components/Sidebar';
+import VisitHeader from './components/VisitHeader';
+import CircularProgress from './components/CircularProgress';
+import PhotoGallery from './components/PhotoGallery';
+import StatusCard from './components/StatusCard';
+import DetailedRules, { Rule } from './components/DetailedRules';
+import VisitList from './components/VisitList';
+import DistributionList from './components/DistributionList';
+import SOSAnalysis from './components/SOSAnalysis';
+import KeyMetricList from './components/KeyMetricList';
+import { MOCK_VISIT } from './constants';
+import RightPanel, { CategoryOption } from './components/RightPanel';
+import { LayoutGrid, PieChart, ClipboardList, Zap, ShieldAlert, Tag as TagIcon, ListChecks, Beer, GlassWater, Wine, Layers, ShoppingBag, PanelLeftClose, ChevronLeft, ChevronDown, MapPin, Calendar as CalendarIcon, CheckCircle2, Search, ChevronRight, Eye, Maximize2 } from 'lucide-react';
+
+const MANUAL_QUESTIONS = [
+  { question: '¿Cliente trabaja esta categoría?', answer: 'Sí' },
+  { question: '¿Se puede ejecutar el cooler de cervezas?', answer: 'Sí' },
+  { question: '¿Se realizó limpieza en el cooler?', answer: 'Sí' },
+  { question: '¿Realiza reposición?', answer: 'Sí' },
+  { question: '¿Cuál es la cantidad de puertas de la categoría? (CCU + Competencia)', answer: '7' }
+];
+
+interface SubNavTabProps {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}
+
+const SubNavTab: React.FC<SubNavTabProps> = ({ label, icon, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center gap-2 px-1 py-3 font-bold text-[11px] uppercase tracking-wider transition-all whitespace-nowrap border-b-2 ${active
+      ? 'border-blue-600 text-blue-600'
+      : 'border-transparent text-slate-400 hover:border-slate-200 hover:text-slate-600'
+      }`}
+  >
+    <span className={active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}>
+      {/* Fix: cast icon to React.ReactElement<any> to resolve TS error where 'size' is not found in unknown props */}
+      {React.cloneElement(icon as React.ReactElement<any>, { size: 16, strokeWidth: active ? 2.5 : 2 })}
+    </span>
+    {label}
+  </button>
+);
+
+const AA42937_LAYOUT_RULES: Rule[] = [
+  { id: 1, label: '1 BANDEJA TRIDENTE LONGNECK BANDEJA 1', status: 'passed' },
+  { id: 2, label: '2 BANDEJA MEDIANA BANDEJA 1', status: 'passed' },
+  { id: 3, label: '3 PUERTA PREMIUM/CRAFT BANDEJA 1', status: 'passed' },
+  { id: 4, label: '4 BANDEJAS RETORNABLE MASIVA BANDEJA 1', status: 'failed' },
+  { id: 5, label: '5 BANDEJA CRAFT LATA BANDEJA 1', status: 'passed' },
+  { id: 6, label: '6 BANDEJA SIXPACK BANDEJA 1', status: 'passed' },
+  { id: 7, label: '7 BANDEJA LATA GRANDE BANDEJA 1', status: 'passed' },
+];
+
+const BB2010_RULES: Rule[] = [
+  { id: 1, label: '4 ESTANTES COLAS BLANCAS Y SABORES', status: 'passed' },
+  { id: 2, label: '4 ESTANTES COLAS NEGRAS', status: 'passed' },
+  { id: 3, label: '4 ESTANTES REFRESCOS', status: 'failed' }
+];
+
+const CATEGORIES: CategoryOption[] = [
+  { id: 'overview', label: 'Overview General', status: 'DONE', icon: <LayoutGrid size={16} /> },
+  { id: 'cervezas', label: 'Cervezas', pts: 50, total: 100, status: 'DONE', icon: <Beer size={16} />, imageUrl: '/heineken.jpg' },
+  { id: 'analcoholicos', label: 'Analcohólicos', pts: 85, total: 100, status: 'DONE', icon: <GlassWater size={16} />, imageUrl: '/pepsi.jpg' },
+  { id: 'vinos', label: 'Vinos y Licores', pts: 100, total: 100, status: 'DONE', icon: <Wine size={16} />, imageUrl: '/brand_logo.png' },
+  { id: 'pop', label: 'Material POP', pts: 100, total: 100, status: 'DONE', icon: <Layers size={16} />, imageUrl: '/brand_logo.png' },
+  { id: 'licores', label: 'Licores Premium', status: 'PENDING', icon: <ShoppingBag size={16} />, imageUrl: '/brand_logo.png' }
+];
+
+const REAL_CASE_CATEGORIES: CategoryOption[] = [
+  { id: 'aceite', label: 'Aceite', pts: 8, total: 8, status: 'DONE', icon: <ShoppingBag size={16} />, group: 'ALIMENTOS BASICOS' },
+  { id: 'arroz', label: 'Arroz', pts: 15, total: 15, status: 'DONE', icon: <ShoppingBag size={16} />, group: 'ALIMENTOS BASICOS' },
+  { id: 'atunes', label: 'Atunes', pts: 12, total: 12, status: 'DONE', icon: <ShoppingBag size={16} />, group: 'ALIMENTOS BASICOS' },
+  { id: 'avenas', label: 'Avenas', pts: 6, total: 6, status: 'DONE', icon: <ShoppingBag size={16} />, group: 'ALIMENTOS BASICOS' },
+  { id: 'agua', label: 'Agua', pts: 4, total: 4, status: 'DONE', icon: <GlassWater size={16} />, group: 'BEBIDAS' },
+  { id: 'bebidas', label: 'Bebidas Deportivas', pts: 2, total: 2, status: 'DONE', icon: <Zap size={16} />, group: 'BEBIDAS' },
+  { id: 'aguardiente', label: 'Aguardiente', pts: 1, total: 1, status: 'DONE', icon: <Wine size={16} />, group: 'LICORES' },
+  { id: 'anis', label: 'Anis', pts: 1, total: 1, status: 'DONE', icon: <Wine size={16} />, group: 'LICORES' },
+];
+
+// MOCK PRODUCTS FOR AA40258 (POLAR VISIT)
+const MOCK_PRODUCTS_POLAR = [
+  { name: 'Agua blanca 1Kg', sku: 'SKU: AG-BL-1000', price: '2.50 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', categoryId: 'aceite' },
+  { name: 'Doña Emilia 1Kg', sku: 'SKU: DE-1000', price: '2.80 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', categoryId: 'aceite' },
+  { name: 'Gran Marques 1Kg', sku: 'SKU: GM-1000', price: '3.00 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', categoryId: 'arroz' },
+  { name: 'Corina 1kg', sku: 'SKU: CR-1000', price: '2.40 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', categoryId: 'arroz' },
+  { name: 'Santoni Premiun (Rojo) 900 grs', sku: 'SKU: SP-900', price: '3.20 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', categoryId: 'atunes' },
+  { name: 'Arroz Mary 1kg', sku: 'SKU: AM-1000', price: '2.10 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', categoryId: 'avenas' },
+  { name: 'Arroz Primor 1kg', sku: 'SKU: AP-1000', price: '2.15 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', categoryId: 'agua' },
+  { name: 'Bebida Deportiva A', sku: 'SKU: BDA-500', price: '1.50 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', categoryId: 'bebidas' },
+  { name: 'Aguardiente X', sku: 'SKU: AGX-750', price: '10.00 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', categoryId: 'aguardiente' },
+  { name: 'Anis Y', sku: 'SKU: ANY-700', price: '8.00 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', categoryId: 'anis' },
+  { name: 'Anis Y', sku: 'SKU: ANY-700', price: '8.00 USD', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', categoryId: 'anis' },
+];
+
+// MOCK DATA FOR DISTRIBUTION CATEGORIES (New Request)
+const MOCK_DIST_CATEGORIES: any[] = [
+  { id: 'refrescos-anaquel', label: 'Refrescos - Anaquel', status: 'DONE', count: 85, thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066' },
+  { id: 'refrescos-exhibicion-anaquel', label: 'Refrescos - Exhibición Adicional (Anaquel)', status: 'DONE', count: 92, thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728' },
+  { id: 'refrescos-exhibicion-colas', label: 'Refrescos - Exhibición Adicional (Colas Negras)', status: 'DONE', count: 78, thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717' },
+  { id: 'refrescos-exhibicion-nevera', label: 'Refrescos - Exhibición Adicional (Nevera)', status: 'DONE', count: 45, thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066' },
+  { id: 'refrescos-nevera-cliente', label: 'Refrescos - Nevera Cliente', status: 'DONE', count: 100, thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728' },
+  { id: 'refrescos-nevera-propia', label: 'Refrescos - Nevera Propia', status: 'DONE', count: 88, thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717' },
+  { id: 'refrescos-inventario', label: 'Refrescos - Inventario en PDV', status: 'DONE', count: 65, thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066' },
+  { id: 'harinas-anaquel', label: 'Harinas - Anaquel', status: 'DONE', count: 72, thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728' },
+  { id: 'harinas-exhibicion', label: 'Harinas - Exhibición Adicional', status: 'DONE', count: 55, thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717' },
+  { id: 'precios', label: 'Recolección de precios', status: 'PENDING', thumbnail: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728' },
+];
+
+const MOCK_DIST_PRODUCTS_POLAR = [
+  // Refrescos - Anaquel
+  { id: 'p1', label: 'Pepsi Lata 355 ML Individual', sku: 'SKU: PEP-355', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'DONE', count: 7, categoryId: 'refrescos-anaquel' },
+  { id: 'p2', label: '7Up Lata 355 ML', sku: 'SKU: 7UP-355', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 5, categoryId: 'refrescos-anaquel' },
+  { id: 'p3', label: 'Gatorade Blue 500ml', sku: 'SKU: GAT-BLU', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', status: 'PENDING', count: 0, categoryId: 'refrescos-anaquel' },
+  { id: 'p4', label: 'Coca-Cola 2L', sku: 'SKU: COC-2L', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'DONE', count: 12, categoryId: 'refrescos-anaquel' },
+
+  // Refrescos - Exhibición Adicional (Anaquel)
+  { id: 'p5', label: 'Pepsi Botella PET 1.5L', sku: 'SKU: PEP-1500', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 14, categoryId: 'refrescos-exhibicion-anaquel' },
+  { id: 'p6', label: 'Sprite 2L', sku: 'SKU: SPR-2000', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', status: 'DONE', count: 8, categoryId: 'refrescos-exhibicion-anaquel' },
+  { id: 'p7', label: 'Fanta Naranja 2L', sku: 'SKU: FAN-NAR-2000', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'DONE', count: 6, categoryId: 'refrescos-exhibicion-anaquel' },
+
+  // Refrescos - Exhibición Adicional (Colas Negras)
+  { id: 'p8', label: 'Coca-Cola 1.5L', sku: 'SKU: COC-1500', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 10, categoryId: 'refrescos-exhibicion-colas' },
+  { id: 'p9', label: 'Pepsi Black 1L', sku: 'SKU: PEP-BLK-1000', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', status: 'DONE', count: 4, categoryId: 'refrescos-exhibicion-colas' },
+  { id: 'p10', label: 'Coca-Cola Zero 2L', sku: 'SKU: COC-ZER-2000', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'DONE', count: 9, categoryId: 'refrescos-exhibicion-colas' },
+
+  // Refrescos - Exhibición Adicional (Nevera)
+  { id: 'p11', label: 'Gatorade Naranja 500ml', sku: 'SKU: GAT-NAR-500', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 3, categoryId: 'refrescos-exhibicion-nevera' },
+  { id: 'p12', label: 'Powerade Azul 500ml', sku: 'SKU: POW-AZU-500', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', status: 'DONE', count: 2, categoryId: 'refrescos-exhibicion-nevera' },
+  { id: 'p13', label: 'Red Bull 250ml', sku: 'SKU: RDB-250', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'PENDING', count: 0, categoryId: 'refrescos-exhibicion-nevera' },
+
+  // Refrescos - Nevera Cliente
+  { id: 'p14', label: 'Coca-Cola Lata 355ml', sku: 'SKU: COC-355', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 18, categoryId: 'refrescos-nevera-cliente' },
+  { id: 'p15', label: 'Pepsi Lata 355ml', sku: 'SKU: PEP-355-L', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', status: 'DONE', count: 15, categoryId: 'refrescos-nevera-cliente' },
+  { id: 'p16', label: 'Sprite Lata 355ml', sku: 'SKU: SPR-355', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'DONE', count: 11, categoryId: 'refrescos-nevera-cliente' },
+  { id: 'p17', label: 'Fanta Lata 355ml', sku: 'SKU: FAN-355', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 8, categoryId: 'refrescos-nevera-cliente' },
+
+  // Refrescos - Nevera Propia
+  { id: 'p18', label: 'Agua Mineral 600ml', sku: 'SKU: AGU-MIN-600', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', status: 'DONE', count: 20, categoryId: 'refrescos-nevera-propia' },
+  { id: 'p19', label: 'Jugo Hit Naranja 1L', sku: 'SKU: HIT-NAR-1000', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'DONE', count: 12, categoryId: 'refrescos-nevera-propia' },
+  { id: 'p20', label: 'Té Fuze Tea 500ml', sku: 'SKU: FUZ-500', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 7, categoryId: 'refrescos-nevera-propia' },
+
+  // Refrescos - Inventario en PDV
+  { id: 'p21', label: 'Coca-Cola 3L', sku: 'SKU: COC-3000', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', status: 'DONE', count: 5, categoryId: 'refrescos-inventario' },
+  { id: 'p22', label: 'Pepsi 3L', sku: 'SKU: PEP-3000', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'DONE', count: 4, categoryId: 'refrescos-inventario' },
+  { id: 'p23', label: 'Sprite 3L', sku: 'SKU: SPR-3000', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 3, categoryId: 'refrescos-inventario' },
+  { id: 'p24', label: '7Up 2.5L', sku: 'SKU: 7UP-2500', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', status: 'PENDING', count: 0, categoryId: 'refrescos-inventario' },
+
+  // Harinas - Anaquel
+  { id: 'p25', label: 'Harina PAN 1Kg', sku: 'SKU: HAR-PAN-1000', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'DONE', count: 6, categoryId: 'harinas-anaquel' },
+  { id: 'p26', label: 'Harina Juana 500g', sku: 'SKU: HAR-JUA-500', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 3, categoryId: 'harinas-anaquel' },
+  { id: 'p27', label: 'Harina Selecta 1Kg', sku: 'SKU: HAR-SEL-1000', image: 'https://raw.githubusercontent.com/user-attachments/assets/898d9494-118e-4a69-805c-3f7495819717', status: 'DONE', count: 4, categoryId: 'harinas-anaquel' },
+
+  // Harinas - Exhibición Adicional
+  { id: 'p28', label: 'Harina PAN Dulce 500g', sku: 'SKU: HAR-PAN-DUL-500', image: 'https://raw.githubusercontent.com/user-attachments/assets/75949e29-6511-40be-ba39-16016e047728', status: 'DONE', count: 2, categoryId: 'harinas-exhibicion' },
+  { id: 'p29', label: 'Harina Integral 1Kg', sku: 'SKU: HAR-INT-1000', image: 'https://raw.githubusercontent.com/user-attachments/assets/802df91e-436d-495f-9ce0-4df234f9a066', status: 'DONE', count: 3, categoryId: 'harinas-exhibicion' },
+
+  // Recolección de precios - EMPTY (Pending survey)
+];
+
+const SaaSDistributionList = ({ category, onProductClick }: { category: CategoryOption, onProductClick: (prod: any) => void }) => {
+  const filteredProducts = category.id === 'overview' ? MOCK_DIST_PRODUCTS_POLAR : MOCK_DIST_PRODUCTS_POLAR.filter(p => p.categoryId === category.id);
+  const [filter, setFilter] = useState<'all' | 'detected' | 'no_facings'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Apply filters
+  const displayedProducts = filteredProducts.filter(prod => {
+    // Filter by detection status
+    if (filter === 'detected' && prod.count === 0) return false;
+    if (filter === 'no_facings' && prod.count > 0) return false;
+
+    // Filter by search
+    if (searchQuery && !prod.label.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+
+    return true;
+  });
+
+  return (
+    <div className="bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[480px]">
+      {/* Survey Title Header - Clean Enterprise Style */}
+      <div className="px-6 py-4 border-b border-slate-200">
+        <h2 className="text-base font-semibold text-slate-900">{category.label}</h2>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${filter === 'all'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFilter('detected')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${filter === 'detected'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                }`}
+            >
+              Detectados
+            </button>
+            <button
+              onClick={() => setFilter('no_facings')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${filter === 'no_facings'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                }`}
+            >
+              Sin facings
+            </button>
+          </div>
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input
+                type="text"
+                placeholder="Buscar productos..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500">Producto</span>
+          <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">{displayedProducts.length}</span>
+        </div>
+        <span className="text-xs font-semibold text-slate-500">Facings</span>
+      </div>
+      <div className="divide-y divide-slate-50 flex-1">
+        {displayedProducts.map((prod, idx) => (
+          <button
+            key={idx}
+            onClick={() => onProductClick(prod)}
+            className="w-full px-6 py-4 flex items-center justify-between hover:bg-blue-50/30 transition-all group text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-6">
+              <div className="relative w-14 h-14 bg-white rounded-[10px] border border-blue-600/20 flex items-center justify-center p-1 group-hover:border-blue-600 transition-all overflow-hidden shadow-sm">
+                <img src={prod.image} className="w-full h-full object-contain" alt="product" />
+                <div className="absolute top-1 right-1 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center text-white cursor-pointer hover:bg-blue-700 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Eye size={10} strokeWidth={2.5} />
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900 leading-tight group-hover:text-blue-700 transition-colors">{prod.label}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs font-medium text-slate-500">{prod.sku}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center">
+                <span className="text-lg font-bold text-slate-700">{prod.count || 0}</span>
+              </div>
+              <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-400" />
+            </div>
+          </button>
+        ))}
+        {displayedProducts.length === 0 && (
+          <div className="flex-1 flex items-center justify-center p-12">
+            <div className="text-center max-w-md">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ShoppingBag size={32} className="text-slate-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">No se encontraron productos</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                {filter !== 'all' || searchQuery
+                  ? 'Intenta ajustar tus filtros o búsqueda para encontrar lo que buscas.'
+                  : 'Esta encuesta está pendiente y no tiene productos asignados aún. Los productos aparecerán aquí una vez que se complete la encuesta.'}
+              </p>
+              {(filter !== 'all' || searchQuery) && (
+                <button
+                  onClick={() => {
+                    setFilter('all');
+                    setSearchQuery('');
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// SOS Area Component
+const SOSAreaView = () => {
+  const [selectedCategory, setSelectedCategory] = useState<string>('colas-negras');
+  const [showEvidence, setShowEvidence] = useState(false);
+
+  const sosCategories = [
+    { id: 'colas-negras', label: 'Colas negras', percentage: 55.2, color: 'blue' },
+    { id: 'colas-blancas', label: 'Colas blancas', percentage: 12.2, color: 'emerald' },
+    { id: 'sabores', label: 'Sabores', percentage: 32.5, color: 'emerald' },
+    { id: 'todos', label: 'Todos los refrescos', percentage: 100, color: 'emerald' },
+  ];
+
+  const currentCategory = sosCategories.find(c => c.id === selectedCategory) || sosCategories[0];
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 h-full">
+      {/* Left: Pie Chart + Categories */}
+      <div className="lg:col-span-5 bg-white border border-slate-200 border-r-0 shadow-sm h-full flex flex-col overflow-hidden">
+        {/* Pie Chart Section */}
+        <div className="p-8 border-b border-slate-200">
+          <p className="text-xs font-medium text-slate-400 mb-4 text-center">
+            Participación interna: <span className="text-blue-600 font-semibold">{currentCategory.label.toUpperCase()}</span>
+          </p>
+
+          {/* Pie Chart */}
+          <div className="relative w-64 h-64 mx-auto">
+            <svg viewBox="0 0 200 200" className="transform -rotate-90">
+              {/* Background circle */}
+              <circle
+                cx="100"
+                cy="100"
+                r="80"
+                fill="none"
+                stroke="#e2e8f0"
+                strokeWidth="20"
+              />
+              {/* Progress arc */}
+              <circle
+                cx="100"
+                cy="100"
+                r="80"
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="20"
+                strokeDasharray={`${(currentCategory.percentage / 100) * 502.4} 502.4`}
+                strokeLinecap="round"
+              />
+            </svg>
+            {/* Center text */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="text-5xl font-bold text-blue-600">{currentCategory.percentage}%</div>
+              <div className="text-xs text-slate-400 mt-1 uppercase">{currentCategory.label}</div>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-400 text-center mt-6">
+            Seleccione una categoría para actualizar el gráfico.
+          </p>
+        </div>
+
+        {/* Category List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {sosCategories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => {
+                setSelectedCategory(cat.id);
+                setShowEvidence(true);
+              }}
+              className={`w-full px-6 py-4 rounded-lg text-left transition-all flex items-center justify-between ${selectedCategory === cat.id
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-emerald-50 text-slate-800 hover:bg-emerald-100 border border-emerald-200'
+                }`}
+            >
+              <span className="font-semibold">{cat.label}: <span className={selectedCategory === cat.id ? 'text-white' : 'text-emerald-600'}>{cat.percentage}%</span></span>
+              <ChevronRight size={20} className={selectedCategory === cat.id ? 'text-white' : 'text-slate-400'} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Right: Photo Evidence */}
+      <div className="lg:col-span-7 bg-white border border-slate-200 border-l-0 shadow-sm h-full">
+        {showEvidence ? (
+          <PhotoGallery />
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <ClipboardList size={48} className="mx-auto text-slate-300 mb-4" />
+              <p className="text-slate-500 font-medium">Selecciona una categoría para ver la evidencia</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const SaaSProductList = ({ category }: { category: CategoryOption }) => {
+  const filteredProducts = MOCK_PRODUCTS_POLAR.filter(p => p.categoryId === category.id);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 5;
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const paginated = filteredProducts.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
+  useEffect(() => {
+    setPage(1);
+  }, [category]);
+
+
+  return (
+    <div className="bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[480px]">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PRODUCT</span>
+          <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{filteredProducts.length} found</span>
+        </div>
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PRICE CHECK</span>
+      </div>
+
+      {/* List */}
+      <div className="divide-y divide-slate-50 flex-1">
+        {paginated.map((prod, idx) => (
+          <div key={idx} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/30 transition-all group">
+            <div className="flex items-center gap-6">
+              {/* Thumbnail with Eye Icon */}
+              <div className="relative w-14 h-14 bg-white rounded-[10px] border border-blue-600/20 flex items-center justify-center p-1 group-hover:border-blue-600 transition-all overflow-hidden shadow-sm">
+                <img src={prod.image} className="w-full h-full object-contain" alt="product" />
+                <div className="absolute top-1 right-1 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center text-white cursor-pointer hover:bg-blue-700 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Eye size={10} strokeWidth={2.5} />
+                </div>
+              </div>
+              <div>
+                <p className="text-[14px] font-bold text-slate-900 leading-tight group-hover:text-blue-700 transition-colors uppercase tracking-tight">{prod.name}</p>
+                <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-wide">{prod.sku}</p>
+              </div>
+            </div>
+            {/* Price Box */}
+            <div className="w-20 h-12 rounded-[10px] flex items-center justify-center border border-slate-200 bg-slate-100 text-slate-900 font-bold text-sm shadow-sm font-mono tracking-tight">
+              {prod.price}
+            </div>
+          </div>
+        ))}
+        {paginated.length === 0 && (
+          <div className="flex items-center justify-center h-full text-slate-400 font-medium">No products found for this category.</div>
+        )}
+      </div>
+
+      {/* Pagination Footer */}
+      <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/20 flex items-center justify-between">
+        <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">
+          Showing {paginated.length} of {filteredProducts.length}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="p-1.5 border border-slate-200 rounded-[6px] hover:bg-white disabled:opacity-30 transition-all shadow-sm"
+          >
+            <ChevronLeft size={16} strokeWidth={2.5} />
+          </button>
+          <span className="text-[12px] font-bold text-slate-600 px-2">Page {page} of {totalPages}</span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages || totalPages === 0}
+            className="p-1.5 border border-slate-200 rounded-[6px] hover:bg-white disabled:opacity-30 transition-all shadow-sm"
+          >
+            <ChevronRight size={16} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const NEW_DESIGN_VISIT = {
+  ...MOCK_VISIT,
+  id: 'NEW-DESIGN-01',
+  customer: 'NUEVO DISEÑO (COLLAPSIBLE)',
+};
+
+const NEW_DESIGN_VISIT_2 = {
+  ...MOCK_VISIT,
+  id: 'NEW-DESIGN-02',
+  customer: 'NUEVO DISEÑO (TABBED)',
+};
+
+const REAL_CASE_VISIT = {
+  ...MOCK_VISIT,
+  id: 'AA40258',
+  customer: 'INVERSIONES DON MANUEL 1959, CA',
+  subtitle: 'Polar',
+  location: 'Caracas, Venezuela',
+  date: '30/12/2025',
+  supervisor: 'Nadja A Belgrave',
+  status: 'COMPLETED',
+  score: 100
+};
+
+const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('visits');
+  const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('overview');
+  // Extended state to include 'price_collections' for AA40258 default
+  const [detailSubTab, setDetailSubTab] = useState<'distribution' | 'sos' | 'rules' | 'price_collections'>('distribution');
+  const [activeRightViewMode, setActiveRightViewMode] = useState<'list' | 'detail'>('list');
+
+  const categories = selectedVisitId === 'AA40258' ? REAL_CASE_CATEGORIES : CATEGORIES;
+
+  // States for AA42937 sectional view filters
+  const [layoutFilter, setLayoutFilter] = useState<'all' | 'passed' | 'failed'>('all');
+  const [contaminacionFilter, setContaminacionFilter] = useState<'all' | 'passed' | 'failed'>('all');
+  const [priceTagFilter, setPriceTagFilter] = useState<'all' | 'passed' | 'failed'>('all');
+
+  // Current active section for AA42937 anchors
+  const [activeAnchor, setActiveAnchor] = useState('layout');
+
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [activeRuleId, setActiveRuleId] = useState<number | null>(null);
+
+
+  const [isInnerSidebarCollapsed, setIsInnerSidebarCollapsed] = useState(false);
+
+  const visit = selectedVisitId === 'NEW-DESIGN-01' ? NEW_DESIGN_VISIT :
+    selectedVisitId === 'NEW-DESIGN-02' ? NEW_DESIGN_VISIT_2 :
+      selectedVisitId === 'AA40258' ? REAL_CASE_VISIT : MOCK_VISIT;
+
+  const handleCategoryChange = (id: string) => {
+    setSelectedCategoryId(id);
+    if (id === 'overview') setActiveTab('overview');
+  };
+
+  const handleVisitSelection = (id: string) => {
+    setSelectedVisitId(id);
+    setActiveTab('overview');
+    setSelectedCategoryId('overview');
+    // Set default tab based on visit ID
+    setDetailSubTab(id === 'AA40258' ? 'price_collections' : 'distribution');
+    setActiveRuleId(null);
+    setGalleryIndex(0);
+    setActiveAnchor('layout');
+    setActiveRightViewMode('list');
+    // Reset filters
+    setLayoutFilter('all');
+    setContaminacionFilter('all');
+    setPriceTagFilter('all');
+  };
+
+  const handleRuleClick = (rule: any) => {
+    setActiveRuleId(rule.id);
+    setGalleryIndex((rule.id - 1) % 3);
+    if (selectedVisitId === 'NEW-DESIGN-02' || selectedVisitId === 'AA40258') {
+      setActiveRightViewMode('detail');
+    }
+  };
+
+
+
+  const scrollToSection = (id: string) => {
+    setActiveAnchor(id);
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const AutomaticBadge = () => (
+    <div className="ml-3 px-2 py-0.5 bg-slate-100 text-slate-400 rounded-[4px] text-[9px] font-bold uppercase tracking-widest border border-slate-200">
+      AUTOMÁTICO
+    </div>
+  );
+
+  const getGaugeProps = (filter: 'all' | 'passed' | 'failed', valid: number, total: number, invalid: number) => {
+    if (filter === 'failed') {
+      return { current: invalid, total: total, color: 'red' as const };
+    }
+    return { current: valid, total: total, color: 'green' as const };
+  };
+
+  // RENDER FOR AA42937 (SECTIONAL LAYOUT)
+  const renderSectionalDetail = () => {
+    const layoutGauge = getGaugeProps(layoutFilter, 73, 100, 27);
+    const contaminacionGauge = getGaugeProps(contaminacionFilter, 24, 24, 0);
+    const priceGauge = getGaugeProps(priceTagFilter, 38, 38, 0);
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <VisitHeader
+          visit={visit}
+          onBack={() => setActiveTab('visits')}
+        />
+
+        {/* Anchor Navigation Menu - Compact Version */}
+        <div className="sticky top-0 z-40 bg-[#FDFEFE]/95 backdrop-blur-sm py-3 border-b border-slate-100 -mx-4 px-4">
+          <div className="flex gap-8 overflow-x-auto no-scrollbar max-w-max">
+            <SubNavTab
+              id="layout"
+              label="Layout"
+              icon={<LayoutGrid />}
+              active={activeAnchor === 'layout'}
+              onClick={() => scrollToSection('layout')}
+            />
+            <SubNavTab
+              id="contaminacion"
+              label="Contaminación"
+              icon={<ShieldAlert />}
+              active={activeAnchor === 'contaminacion'}
+              onClick={() => scrollToSection('contaminacion')}
+            />
+            <SubNavTab
+              id="etiquetas"
+              label="Etiquetas"
+              icon={<TagIcon />}
+              active={activeAnchor === 'etiquetas'}
+              onClick={() => scrollToSection('etiquetas')}
+            />
+            <SubNavTab
+              id="manuales"
+              label="Respuestas"
+              icon={<ClipboardList />}
+              active={activeAnchor === 'manuales'}
+              onClick={() => scrollToSection('manuales')}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-12 xl:col-span-8 space-y-20 pb-12">
+
+            {/* Section: Layout */}
+            <div id="layout" className="space-y-6 scroll-mt-24">
+              <div className="flex items-center"><h2 className="text-xl font-bold text-slate-900 tracking-tight">Layout</h2><AutomaticBadge /></div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatusCard type="valid" label="VÁLIDAS" value={73} active={layoutFilter === 'passed'} onClick={() => setLayoutFilter(layoutFilter === 'passed' ? 'all' : 'passed')} />
+                <StatusCard type="score" label="SCORE" value={`${layoutGauge.current}/${layoutGauge.total}`}>
+                  <CircularProgress current={layoutGauge.current} total={layoutGauge.total} size={88} color={layoutGauge.color} showText={true} />
+                </StatusCard>
+                <StatusCard type="invalid" label="INVÁLIDAS" value={27} active={layoutFilter === 'failed'} onClick={() => setLayoutFilter(layoutFilter === 'failed' ? 'all' : 'failed')} />
+              </div>
+              <DetailedRules forcedFilter={layoutFilter} onFilterChange={setLayoutFilter} onRuleClick={handleRuleClick} activeRuleId={activeRuleId} customRules={AA42937_LAYOUT_RULES} />
+            </div>
+
+            {/* Section: Contaminación */}
+            <div id="contaminacion" className="space-y-6 pt-12 border-t border-slate-100 scroll-mt-24">
+              <div className="flex items-center"><h2 className="text-xl font-bold text-slate-900 tracking-tight">Contaminación</h2><AutomaticBadge /></div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatusCard type="valid" label="VÁLIDAS" value={24} active={contaminacionFilter === 'passed'} onClick={() => setContaminacionFilter(contaminacionFilter === 'passed' ? 'all' : 'passed')} />
+                <StatusCard type="score" label="SCORE" value={`${contaminacionGauge.current}/${contaminacionGauge.total}`}>
+                  <CircularProgress current={contaminacionGauge.current} total={contaminacionGauge.total} size={88} color={contaminacionGauge.color} showText={true} />
+                </StatusCard>
+                <StatusCard type="invalid" label="INVÁLIDAS" value={0} active={contaminacionFilter === 'failed'} onClick={() => setContaminacionFilter(contaminacionFilter === 'failed' ? 'all' : 'failed')} />
+              </div>
+              <KeyMetricList metrics={[{ label: 'Contaminación interna', value: 1 }, { label: 'Contaminación externa', value: 1 }, { label: 'Contaminación mixta', value: 1 }]} />
+            </div>
+
+            {/* Section: Etiquetas de Precio */}
+            <div id="etiquetas" className="space-y-6 pt-12 border-t border-slate-100 scroll-mt-24">
+              <div className="flex items-center"><h2 className="text-xl font-bold text-slate-900 tracking-tight">Etiquetas de Precio</h2><AutomaticBadge /></div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatusCard type="valid" label="VÁLIDAS" value={38} active={priceTagFilter === 'passed'} onClick={() => setPriceTagFilter(priceTagFilter === 'passed' ? 'all' : 'passed')} />
+                <StatusCard type="score" label="SCORE" value={`${priceGauge.current}/${priceGauge.total}`}>
+                  <CircularProgress current={priceGauge.current} total={priceGauge.total} size={88} color={priceGauge.color} showText={true} />
+                </StatusCard>
+                <StatusCard type="invalid" label="INVÁLIDAS" value={0} active={priceTagFilter === 'failed'} onClick={() => setPriceTagFilter(priceTagFilter === 'failed' ? 'all' : 'failed')} />
+              </div>
+              <KeyMetricList title="Key Metric" metrics={[{ label: 'N° Etiquetas Detectadas', value: 38 }, { label: 'N° Bandejas con Precio', value: 24 }]} />
+            </div>
+
+            <div id="manuales" className="pt-12 border-t border-slate-100 scroll-mt-24">
+              <h3 className="text-lg font-bold text-slate-900 tracking-tight mb-6 uppercase">Respuestas Manuales</h3>
+              <div className="w-full">
+                {MANUAL_QUESTIONS.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-start py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors px-2">
+                    <span className="text-slate-600 font-medium text-sm max-w-[70%]">{item.question}</span>
+                    <span className="text-slate-900 font-bold text-sm text-right">{item.answer}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          {/* For Layout 2 (Tabbed), we DO NOT render the visible PhotoGallery here. It goes to the Right Panel. */}
+          {/* For Layout 1 (Collapsible) and normal, we render it here */}
+          {selectedVisitId !== 'NEW-DESIGN-02' && (
+            <div className="hidden xl:block xl:col-span-4 h-[calc(100vh-180px)] min-h-[600px] sticky top-24">
+              <PhotoGallery selectedIndex={galleryIndex} />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+
+
+  // RENDER FOR AA40258 (SAAS STYLE)
+  const renderPriceCollectionDetail = () => {
+    // Determine which list to use based on the active sub-tab
+    const isDistribution = detailSubTab === 'distribution';
+
+    // Select items for the sidebar based on mode
+    // distribution: MOCK_DIST_CATEGORIES (categories, not products)
+    // price_collections: REAL_CASE_CATEGORIES
+    const sidebarItems: any[] = isDistribution ? MOCK_DIST_CATEGORIES : REAL_CASE_CATEGORIES;
+
+    // Ensure selected item is valid
+    const currentItem = sidebarItems.find(c => c.id === selectedCategoryId) || sidebarItems[0];
+
+    const getCategoryStats = (catId: string) => {
+      const prod = MOCK_PRODUCTS_POLAR.filter(p => p.categoryId === catId);
+      return { count: prod.length, tags: prod.length };
+    };
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col">
+        <VisitHeader
+          visit={visit}
+          onBack={() => setActiveTab('visits')}
+          hideScore={true}
+          hideTasks={true}
+        />
+
+        {/* Tab Bar Switcher */}
+        <div className="flex gap-6 border-b border-slate-100 pb-0 overflow-x-auto no-scrollbar pt-2 px-2">
+          <button
+            onClick={() => { setDetailSubTab('price_collections'); setSelectedCategoryId(REAL_CASE_CATEGORIES[0].id); setActiveRightViewMode('list'); }}
+            className={`flex items-center gap-2 px-1 py-3 font-semibold text-sm transition-all whitespace-nowrap border-b-2 ${detailSubTab === 'price_collections' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+          >
+            <LayoutGrid size={16} strokeWidth={detailSubTab === 'price_collections' ? 2.5 : 2} /> Recolección de precios (40)
+          </button>
+
+          <button
+            onClick={() => { setDetailSubTab('distribution'); setSelectedCategoryId(MOCK_DIST_CATEGORIES[0].id); setActiveRightViewMode('list'); }}
+            className={`flex items-center gap-2 px-1 py-3 font-semibold text-sm transition-all whitespace-nowrap border-b-2 ${detailSubTab === 'distribution' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+          >
+            <PieChart size={16} strokeWidth={detailSubTab === 'distribution' ? 2.5 : 2} /> Distribuciones (3)
+          </button>
+
+          <button
+            onClick={() => { setDetailSubTab('sos'); setActiveRightViewMode('list'); }}
+            className={`flex items-center gap-2 px-1 py-3 font-semibold text-sm transition-all whitespace-nowrap border-b-2 ${detailSubTab === 'sos' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+          >
+            <ClipboardList size={16} strokeWidth={detailSubTab === 'sos' ? 2.5 : 2} /> SOS Area
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 h-full">
+          {/* Left Column: List (Category or Survey) */}
+          <div className="lg:col-span-4 flex flex-col h-[calc(100vh-250px)]">
+            <div className="bg-white border border-slate-200 border-r-0 shadow-sm flex flex-col overflow-hidden h-full">
+              <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="font-semibold text-slate-700 text-xs">{isDistribution ? 'Lista de encuestas' : 'Categoría'}</h3>
+                <span className="bg-slate-200 text-slate-600 text-xs font-semibold px-2 py-0.5 rounded-full">{sidebarItems.length}</span>
+              </div>
+              <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                {sidebarItems.map(item => {
+                  const isSelected = selectedCategoryId === item.id;
+
+                  // Logic for Price Collection Categories
+                  const showStats = !isDistribution;
+                  const stats = showStats ? getCategoryStats(item.id) : null;
+
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => { setSelectedCategoryId(item.id); setActiveRightViewMode('list'); }}
+                      className={`w-full flex items-center justify-between px-3 py-3 rounded-lg text-sm font-medium transition-all group ${isSelected
+                        ? (isDistribution ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100' : 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100')
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
+                        }`}
+                    >
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        {isDistribution && (
+                          <div className="w-12 h-12 rounded-lg bg-white border-2 border-slate-200 flex items-center justify-center p-1 overflow-hidden flex-shrink-0">
+                            <img src={item.thumbnail || 'https://via.placeholder.com/48'} className="w-full h-full object-contain" alt={item.label} />
+                          </div>
+                        )}
+
+                        <div className="flex flex-col items-start gap-0.5 min-w-0">
+                          <span className="truncate leading-tight w-full text-left text-sm font-semibold text-slate-900">{item.label}</span>
+
+                          {showStats && stats && (
+                            <span className="text-xs font-medium text-slate-500">
+                              {stats.count} Products • {stats.tags} Price Tags
+                            </span>
+                          )}
+
+                          {isDistribution && (
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-[4px] border ${item.status === 'DONE' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                {item.status === 'DONE' ? 'Listo' : 'Pendiente'}
+                              </span>
+                              {item.count !== undefined && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs font-medium text-slate-400">Score:</span>
+                                  <span className={`text-sm font-bold ${item.count <= 50 ? 'text-orange-600' : 'text-blue-600'}`}>{item.count}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className={`opacity-50 transition-opacity flex-shrink-0 ${isSelected ? 'opacity-100' : 'group-hover:opacity-75'}`} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Detail Panel */}
+          <div className="lg:col-span-8 h-[calc(100vh-250px)]">
+            {detailSubTab === 'sos' ? (
+              <div className="h-full">
+                <SOSAreaView />
+              </div>
+            ) : isDistribution ? (
+              <div className="h-full overflow-hidden">
+                <SaaSDistributionList
+                  category={currentItem}
+                  onProductClick={(prod) => {
+                    setActiveRightViewMode('detail');
+                    setGalleryIndex(0);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="h-full overflow-hidden">
+                <SaaSProductList category={currentItem} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Evidence Panel Overlay (Side Panel) - Only for Distribution */}
+        {isDistribution && activeRightViewMode === 'detail' && (
+          <div className="fixed inset-0 bg-black/50 z-50 animate-in fade-in duration-200">
+            <div className="absolute right-0 top-0 h-full w-full max-w-3xl bg-slate-900 shadow-2xl animate-in slide-in-from-right duration-300">
+              <div className="relative h-full">
+                <PhotoGallery selectedIndex={0} />
+                <button
+                  onClick={() => setActiveRightViewMode('list')}
+                  className="absolute top-4 right-4 bg-black/70 hover:bg-black/90 text-white p-3 rounded-full backdrop-blur-sm transition-all z-10 shadow-lg"
+                >
+                  <PanelLeftClose size={24} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const SaaSProductList_REMOVED = () => null; // Placeholder to remove old SaaSDistributionList if needed, I just removed the call.
+
+  // RENDER FOR BB2010 / AA42938 (TABBED LAYOUT)
+  const renderTabbedDetail = () => (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <VisitHeader
+        visit={{ ...visit, id: selectedVisitId || 'BB2010', customer: selectedVisitId === 'BB2010' ? 'SUPER 10 - BUCARAMANGA 10' : 'Comercializadora Rosal' }}
+        onBack={() => setActiveTab('visits')}
+        hideScore={true}
+        hideTasks={true}
+        facingsCount={40}
+      />
+      <div className="flex gap-2 border-b border-slate-100 pb-4 overflow-x-auto no-scrollbar pt-2">
+        <SubNavTab id="distribution" label="Distribution" icon={<LayoutGrid />} active={detailSubTab === 'distribution'} onClick={() => { setDetailSubTab('distribution'); setActiveRuleId(null); setGalleryIndex(0); }} />
+        <SubNavTab id="sos" label="SOS Area" icon={<PieChart />} active={detailSubTab === 'sos'} onClick={() => { setDetailSubTab('sos'); setActiveRuleId(null); setGalleryIndex(1); }} />
+        <SubNavTab id="rules" label="Rules" icon={<ClipboardList />} active={detailSubTab === 'rules'} onClick={() => { setDetailSubTab('rules'); setActiveRuleId(null); setGalleryIndex(0); }} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-7">
+          {detailSubTab === 'distribution' && <DistributionList />}
+          {detailSubTab === 'sos' && <SOSAnalysis />}
+          {detailSubTab === 'rules' && (
+            <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-400">
+              <div className="flex items-end justify-between border-b border-slate-100 pb-2">
+                <div className="flex flex-col"><span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-1">Audit Overview</span><h3 className="text-lg font-bold text-slate-900 tracking-tight uppercase">Validation Metrics</h3></div>
+                <div className="flex items-center gap-2"><span className="text-2xl font-black text-slate-300 tracking-tighter">03</span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Checks</span></div>
+              </div>
+              <DetailedRules customRules={BB2010_RULES} onRuleClick={handleRuleClick} activeRuleId={activeRuleId} />
+            </div>
+          )}
+        </div>
+        <div className="lg:col-span-5 h-[calc(100vh-220px)] min-h-[650px] sticky top-8"><PhotoGallery selectedIndex={galleryIndex} /></div>
+      </div>
+    </div>
+  );
+
+  const isNewLayout = selectedVisitId === 'NEW-DESIGN-01' || selectedVisitId === 'NEW-DESIGN-02';
+
+  // ...
+  const isLayout2 = selectedVisitId === 'NEW-DESIGN-02';
+
+  return (
+    <div className="flex h-screen bg-[#FDFEFE] overflow-hidden text-sm">
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        variant="dark"
+      />
+
+      {/* NEW LAYOUT 2: Inner Left Sidebar for Surveys - Only in Detail View */}
+      {isLayout2 && activeTab === 'overview' && (
+        <aside className={`${isInnerSidebarCollapsed ? 'w-[72px]' : 'w-[320px]'} bg-white border-r border-slate-200 h-full flex flex-col z-20 animate-in slide-in-from-left duration-300 transition-all`}>
+          <RightPanel
+            categories={categories}
+            selectedId={selectedCategoryId}
+            onSelect={handleCategoryChange}
+            withTabs={false}
+            collapsible={true}
+            isCollapsed={isInnerSidebarCollapsed}
+            onCollapseChange={setIsInnerSidebarCollapsed}
+          />
+        </aside>
+      )}
+
+      {/* Main Content Area */}
+      <main className="flex-1 flex overflow-hidden relative bg-slate-50">
+        <div className="flex-1 overflow-y-auto w-full">
+          <div className="max-w-[1440px] mx-auto p-4 lg:p-8">
+            {activeTab === 'visits' && <VisitList onVisitSelect={handleVisitSelection} />}
+
+            {activeTab === 'overview' && (
+              selectedVisitId ? (
+                (selectedVisitId === 'BB2010' || selectedVisitId === 'NEW-DESIGN-02') ? renderTabbedDetail() :
+                  (selectedVisitId === 'AA40258') ? renderPriceCollectionDetail() : renderSectionalDetail()
+              ) : (
+                <div className="flex items-center justify-center h-64 text-slate-400 font-medium">Seleccione una visita para ver el detalle.</div>
+              )
+            )}
+
+            {activeTab === 'puntos' && <div className="p-8"><h1 className="text-2xl font-bold text-slate-900">Puntos de Venta</h1></div>}
+            {activeTab === 'reportes' && <div className="p-8"><h1 className="text-2xl font-bold text-slate-900">Reportes</h1></div>}
+            {activeTab === 'config' && <div className="p-8"><h1 className="text-2xl font-bold text-slate-900">Configuración</h1></div>}
+          </div>
+        </div>
+
+        {/* 
+            OLD RIGHT PANEL LOCATION (Right Side)
+            Only show if we are in 'overview' mode
+          */}
+        {activeTab === 'overview' && !isLayout2 && selectedVisitId !== 'AA40258' && (
+          <aside className="hidden xl:flex border-l border-slate-100 bg-white h-full z-10 shadow-[-4px_0_24px_rgba(0,0,0,0.02)] transition-all ease-in-out duration-300">
+            <RightPanel
+              categories={CATEGORIES}
+              selectedId={selectedCategoryId}
+              onSelect={handleCategoryChange}
+              collapsible={selectedVisitId === 'NEW-DESIGN-01'}
+            />
+          </aside>
+        )}
+
+        {/* Evidence Panel (Floating) - Shared by Layout 2 and AA40258 Distribution */}
+        {activeTab === 'overview' && (isLayout2 || (selectedVisitId === 'AA40258' && detailSubTab === 'distribution')) && activeRightViewMode === 'detail' && (
+          <aside className="w-[450px] bg-white border-l border-slate-200 h-full flex flex-col z-30 shadow-2xl absolute right-0 top-0 bottom-0 animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <button
+                onClick={() => setActiveRightViewMode('list')}
+                className="flex items-center gap-2 text-slate-500 hover:text-slate-800"
+              >
+                <PanelLeftClose className="rotate-180" size={16} /> <span className="font-bold text-xs uppercase">Ocultar Evidencia</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden relative">
+              <PhotoGallery selectedIndex={galleryIndex} />
+            </div>
+          </aside>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default App;
