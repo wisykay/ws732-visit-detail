@@ -51,6 +51,15 @@ export interface VisitListItem {
   fechaFin: string;
   tareas: number;
   asignadoA: string;
-  realizadoPor: string;
+  realizadoPor?: string;
   estado: string;
+  // Extended fields
+  supervisorId?: string;
+  supervisor?: string;
+  statusId?: string;
+  distancia?: string;
+  routeKey?: string;
+  tipo?: string;
+  executionStatus?: 'Ejecutada' | 'No Visitada';
+  taskNames?: string[];
 }
